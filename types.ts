@@ -3,7 +3,8 @@ export interface GameState {
   currentWord: string | null;
   points: number;
   message: string;
-  gameType: 'SYLLABLES' | 'COMPLETE_WORD' | 'GUESS_OBJECT' | 'READ_ALOUD' | 'IDLE';
+  gameType: 'WORD_SEARCH' | 'SCRAMBLE' | 'RIDDLE' | 'READ_ALOUD' | 'IDLE';
+  grid?: string[][]; // Para o Caça-Palavras
   options?: string[];
 }
 

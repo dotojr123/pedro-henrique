@@ -9,36 +9,55 @@ interface GameDisplayProps {
 const GameDisplay: React.FC<GameDisplayProps> = ({ gameState }) => {
   if (gameState.gameType === 'IDLE') {
     return (
-      <div className="bg-white/80 backdrop-blur-sm p-8 rounded-3xl border-4 border-dashed border-sky-300 text-center max-w-md w-full">
-        <h2 className="text-2xl font-bold text-sky-800 mb-2">Olá, Pedro Henrique! 👋</h2>
-        <p className="text-sky-600">Diga "Olá" para começarmos a brincar de ler!</p>
+      <div className="bg-slate-800/50 backdrop-blur-md p-8 rounded-2xl border border-slate-700 text-center max-w-md w-full">
+        <h2 className="text-xl font-bold text-sky-400 mb-4 code-font">MÓDULO DE TREINO: OFFLINE</h2>
+        <p className="text-slate-400 text-sm">Pedro, conecte o microfone para iniciar a missão de hoje.</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-white p-8 rounded-3xl shadow-xl border-4 border-orange-200 text-center max-w-lg w-full transform transition-all hover:scale-[1.02]">
-      <div className="mb-4 text-sm font-bold text-orange-400 uppercase tracking-widest">
-        {gameState.gameType.replace('_', ' ')}
+    <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-2xl max-w-lg w-full">
+      <div className="flex justify-between items-center mb-6">
+        <span className="text-[10px] font-bold text-sky-500 uppercase tracking-widest bg-sky-500/10 px-2 py-1 rounded">
+          Missão: {gameState.gameType.replace('_', ' ')}
+        </span>
+        <div className="flex gap-1">
+          <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+          <div className="w-2 h-2 rounded-full bg-slate-600"></div>
+        </div>
       </div>
       
-      <div className="text-6xl font-black text-sky-900 mb-6 tracking-tight title-font">
-        {gameState.currentWord || '...'}
-      </div>
+      {gameState.gameType === 'WORD_SEARCH' && gameState.grid ? (
+        <div className="grid grid-cols-5 gap-2 mb-6 bg-slate-900 p-4 rounded-xl">
+          {gameState.grid.flat().map((char, i) => (
+            <div key={i} className="aspect-square flex items-center justify-center bg-slate-800 border border-slate-700 rounded text-xl font-bold text-sky-300 hover:bg-sky-500/20 cursor-default transition-colors">
+              {char}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="text-4xl font-bold text-white mb-6 text-center leading-tight">
+          {gameState.currentWord}
+        </div>
+      )}
 
       {gameState.options && gameState.options.length > 0 && (
-        <div className="grid grid-cols-2 gap-4 mt-6">
+        <div className="grid grid-cols-1 gap-3 mt-4">
           {gameState.options.map((opt, i) => (
-            <div key={i} className="p-4 bg-sky-50 rounded-xl border-2 border-sky-200 text-2xl font-bold text-sky-700">
+            <div key={i} className="p-3 bg-slate-900 border border-slate-700 rounded-lg text-sm font-medium text-slate-300 flex items-center gap-3">
+              <span className="w-5 h-5 flex items-center justify-center bg-sky-500/20 text-sky-500 rounded text-[10px]">{i+1}</span>
               {opt}
             </div>
           ))}
         </div>
       )}
 
-      <p className="mt-6 text-xl text-gray-700 italic">
-        {gameState.message}
-      </p>
+      <div className="mt-6 pt-6 border-t border-slate-700">
+        <p className="text-sm text-sky-400/80 code-font">
+          > {gameState.message}
+        </p>
+      </div>
     </div>
   );
 };
