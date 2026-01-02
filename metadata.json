@@ -1,0 +1,7 @@
+{
+  "name": "Professor Mágico do Pedro",
+  "description": "Um tutor particular inteligente e divertido focado em alfabetização e estímulo à leitura para o Pedro Henrique.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
