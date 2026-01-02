@@ -2,9 +2,11 @@
 export interface GameState {
   currentWord: string | null;
   points: number;
+  level: number;
+  progressNextLevel: number; // 0 a 100
   message: string;
   gameType: 'WORD_SEARCH' | 'SCRAMBLE' | 'RIDDLE' | 'READ_ALOUD' | 'IDLE';
-  grid?: string[][]; // Para o Caça-Palavras
+  grid?: string[][];
   options?: string[];
 }
 

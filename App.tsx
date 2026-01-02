@@ -9,7 +9,7 @@ import {
   decodeAudioData, 
   decodeBase64 
 } from './utils/audioUtils';
-import { Mic, MicOff, Zap, Shield, Target, Cpu } from 'lucide-react';
+import { Mic, MicOff, Zap, Shield, Target, Cpu, ChevronUp } from 'lucide-react';
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
 
@@ -17,7 +17,7 @@ const updateGameFunction: FunctionDeclaration = {
   name: 'updateGameUI',
   parameters: {
     type: Type.OBJECT,
-    description: 'Atualiza a interface de missões de leitura para o Pedro Henrique.',
+    description: 'Atualiza o status da missão e o nível de dificuldade do Pedro.',
     properties: {
       gameType: {
         type: Type.STRING,
@@ -25,7 +25,7 @@ const updateGameFunction: FunctionDeclaration = {
       },
       currentWord: {
         type: Type.STRING,
-        description: 'A palavra, frase ou pergunta principal.',
+        description: 'Texto principal. Comece fácil (Nível 1) e aumente conforme sucesso.',
       },
       grid: {
         type: Type.ARRAY,
@@ -33,19 +33,25 @@ const updateGameFunction: FunctionDeclaration = {
           type: Type.ARRAY,
           items: { type: Type.STRING }
         },
-        description: 'Grid 5x5 de letras se for Word Search.',
       },
       message: {
         type: Type.STRING,
-        description: 'Instrução curta e objetiva do mentor.',
+        description: 'Feedback curto. Se ele errar, seja encorajador e simplifique.',
+      },
+      levelUpdate: {
+        type: Type.INTEGER,
+        description: 'O nível atual de dificuldade (1 a 5).',
+      },
+      progressIncrement: {
+        type: Type.INTEGER,
+        description: 'Quanto de progresso dar para essa resposta (10 a 30).',
       },
       options: {
         type: Type.ARRAY,
         items: { type: Type.STRING },
-        description: 'Opções de resposta ou dicas.',
       }
     },
-    required: ['gameType', 'currentWord', 'message'],
+    required: ['gameType', 'currentWord', 'message', 'levelUpdate', 'progressIncrement'],
   },
 };
 
@@ -56,7 +62,9 @@ const App: React.FC = () => {
   const [gameState, setGameState] = useState<GameState>({
     currentWord: null,
     points: 0,
-    message: 'Aguardando comando de inicialização...',
+    level: 1,
+    progressNextLevel: 0,
+    message: 'Sistema Orion pronto. Aguardando inicialização do Pedro.',
     gameType: 'IDLE'
   });
 
@@ -80,19 +88,21 @@ const App: React.FC = () => {
         config: {
           responseModalities: [Modality.AUDIO],
           speechConfig: {
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Puck' } }, // Voz mais neutra/cool
+            voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Puck' } },
           },
-          systemInstruction: `Você é o "Mentor Orion", um treinador de leitura avançado para o Pedro Henrique (8 anos).
-          Pedro já sabe ler, mas precisa de desafios que estimulem a velocidade e interpretação.
-          DIRETRIZES:
-          1. PERSONA: Direto, técnico e incentivador. Use termos como "Missão", "Sincronização", "Nível".
-          2. COMUNICAÇÃO: Frases curtas. Não encha linguiça. Se ele acertar, diga "Alvo atingido. Excelente leitura".
-          3. MISSÕES:
-             - WORD_SEARCH: Crie um grid 5x5 e esconda uma palavra. Peça para ele achar.
-             - SCRAMBLE: Dê uma frase curta bagunçada e peça para ele ler na ordem certa.
-             - RIDDLE: Dê uma charada curta que ele precise ler e interpretar.
-          4. DIDÁTICA: Explique brevemente o porquê de uma regra gramatical se ele errar, mas sem palestras.
-          5. Chame-o de Pedro. Não use voz infantilizada. Trate-o como um jovem explorador de dados.`,
+          systemInstruction: `Você é o "Mentor Orion". Sua missão é ensinar leitura ao Pedro Henrique (8 anos) de forma GRADUAL.
+          ESTRATÉGIA DE NÍVEIS:
+          - NÍVEL 1: Palavras curtas (ex: CASA, BOLA), rimas simples, frases de no máximo 3 palavras.
+          - NÍVEL 2: Palavras com dígrafos (CH, LH, NH, RR) e frases de até 5 palavras.
+          - NÍVEL 3: Pequenos enigmas e textos de 2 linhas para leitura fluida.
+          - NÍVEL 4+: Caça-palavras (WORD_SEARCH) e interpretação.
+
+          REGRAS CRÍTICAS:
+          1. Comece SEMPRE no Nível 1. Não pule etapas.
+          2. Se o Pedro acertar 2 vezes seguidas, suba o progresso. Quando chegar a 100%, suba o Nível.
+          3. SE O PEDRO ERRAR: Simplifique imediatamente. Se ele travou numa palavra difícil, mude para uma fácil no próximo turno.
+          4. Seja direto e curto. Exemplos: "Alvo atingido, Pedro. Próxima missão.", "Quase! Vamos tentar uma mais simples?".
+          5. Use 'updateGameUI' em cada interação para refletir o nível e progresso.`,
           tools: [{ functionDeclarations: [updateGameFunction] }]
         },
         callbacks: {
@@ -112,23 +122,36 @@ const App: React.FC = () => {
               for (const fc of msg.toolCall.functionCalls) {
                 if (fc.name === 'updateGameUI') {
                   const args = fc.args as any;
-                  setGameState(prev => ({
-                    ...prev,
-                    gameType: args.gameType,
-                    currentWord: args.currentWord,
-                    message: args.message,
-                    grid: args.grid,
-                    options: args.options
-                  }));
                   
-                  if (args.message.toLowerCase().includes('excelente') || args.message.toLowerCase().includes('atingido')) {
+                  setGameState(prev => {
+                    let newProgress = prev.progressNextLevel + (args.progressIncrement || 0);
+                    let newLevel = args.levelUpdate || prev.level;
+                    
+                    if (newProgress >= 100) {
+                      newProgress = 0;
+                      newLevel = Math.min(newLevel + 1, 5);
+                    }
+
+                    return {
+                      ...prev,
+                      gameType: args.gameType,
+                      currentWord: args.currentWord,
+                      message: args.message,
+                      grid: args.grid,
+                      options: args.options,
+                      level: newLevel,
+                      progressNextLevel: newProgress,
+                      points: prev.points + (args.progressIncrement > 0 ? 10 : 0)
+                    };
+                  });
+                  
+                  if (args.progressIncrement > 0) {
                     setMood(TutorMood.CELEBRATING);
-                    setGameState(prev => ({ ...prev, points: prev.points + 25 }));
                     setTimeout(() => setMood(TutorMood.HAPPY), 2000);
                   }
 
                   sessionPromise.then(session => session.sendToolResponse({
-                    functionResponses: { id: fc.id, name: fc.name, response: { status: 'synchronized' } }
+                    functionResponses: { id: fc.id, name: fc.name, response: { status: 'calibrated' } }
                   }));
                 }
               }
@@ -177,84 +200,70 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen relative flex flex-col items-center p-4">
       {/* Header */}
-      <header className="w-full max-w-5xl flex justify-between items-center py-8 px-6">
+      <header className="w-full max-w-5xl flex justify-between items-center py-6 px-4 md:px-8">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-sky-500 rounded-xl shadow-[0_0_15px_rgba(14,165,233,0.5)]">
-            <Cpu className="text-slate-900" size={24} />
+          <div className="p-2 bg-sky-500 rounded-lg">
+            <Cpu className="text-slate-900" size={20} />
           </div>
           <div>
-            <h1 className="text-xl font-extrabold text-white tracking-tight uppercase">
-              Orion <span className="text-sky-500">Core</span>
+            <h1 className="text-lg font-bold text-white tracking-tighter uppercase code-font">
+              Orion <span className="text-sky-500">v2.1</span>
             </h1>
-            <div className="text-[10px] text-sky-500/60 font-bold tracking-widest uppercase">Protocolo de Leitura</div>
           </div>
         </div>
         
-        <div className="flex items-center gap-8 bg-slate-800/80 border border-slate-700 px-6 py-3 rounded-xl backdrop-blur-sm">
-          <div className="flex items-center gap-3 border-r border-slate-700 pr-6">
-            <Target className="text-sky-500" size={18} />
-            <div className="flex flex-col">
-              <span className="text-[10px] text-slate-500 font-bold uppercase">Sincronia</span>
-              <span className="text-sm font-bold text-white">{gameState.points} XP</span>
-            </div>
+        <div className="flex items-center gap-4 bg-slate-800/50 border border-slate-700/50 px-4 py-2 rounded-xl">
+          <div className="flex items-center gap-2 border-r border-slate-700 pr-4">
+            <ChevronUp className="text-sky-500" size={16} />
+            <span className="text-xs font-bold text-white">Lvl {gameState.level}</span>
           </div>
-          <div className="flex items-center gap-3">
-            <Shield className="text-emerald-500" size={18} />
-            <div className="flex flex-col">
-              <span className="text-[10px] text-slate-500 font-bold uppercase">Usuário</span>
-              <span className="text-sm font-bold text-white">Pedro H.</span>
-            </div>
+          <div className="flex items-center gap-2">
+            <Target className="text-emerald-500" size={16} />
+            <span className="text-xs font-bold text-white">{gameState.points} XP</span>
           </div>
         </div>
       </header>
 
       {/* Main Mission Control */}
-      <main className="flex-1 w-full max-w-5xl flex flex-col lg:flex-row items-center justify-center gap-16">
+      <main className="flex-1 w-full max-w-5xl flex flex-col lg:flex-row items-center justify-center gap-8 lg:gap-16">
         
-        {/* Mentor Panel */}
         <div className="flex flex-col items-center">
           <MagicAvatar mood={mood} isSpeaking={isSpeaking} />
           
           <button
             onClick={isActive ? stopTutor : startTutor}
-            className={`mt-10 group relative flex items-center justify-center w-24 h-24 rounded-2xl transition-all duration-300 transform active:scale-95 shadow-xl ${
+            className={`mt-8 flex items-center justify-center w-20 h-20 rounded-2xl transition-all duration-300 transform active:scale-95 shadow-xl ${
               isActive 
                 ? 'bg-red-500/20 border-2 border-red-500 text-red-500' 
-                : 'bg-sky-500/10 border-2 border-sky-500 text-sky-500 hover:bg-sky-500 hover:text-white'
+                : 'bg-sky-500 border-2 border-sky-400 text-slate-900 hover:bg-sky-400'
             }`}
           >
-            {isActive ? <MicOff size={36} /> : <Mic size={36} />}
-            <div className={`absolute -inset-4 rounded-full border border-sky-500/20 animate-ping ${!isActive && 'hidden'}`}></div>
+            {isActive ? <MicOff size={32} /> : <Mic size={32} />}
           </button>
           
-          <p className="mt-6 text-slate-500 text-xs font-bold uppercase tracking-widest">
-            {isActive ? 'Link Ativo' : 'Iniciar Conexão'}
+          <p className="mt-4 text-slate-500 text-[10px] font-bold uppercase tracking-widest">
+            {isActive ? 'Link de Voz Estabilizado' : 'Conectar com Orion'}
           </p>
         </div>
 
-        {/* Tactical Display */}
-        <div className="flex-1 w-full flex flex-col items-center">
+        <div className="flex-1 w-full flex flex-col items-center max-w-lg">
           <GameDisplay gameState={gameState} />
           
-          <div className="mt-10 grid grid-cols-2 gap-4 w-full">
-            <div className="bg-slate-800/40 p-4 rounded-xl border border-slate-700/50 flex items-center gap-4">
-              <Zap className="text-yellow-500" size={20} />
-              <div className="text-[10px] text-slate-400 font-bold uppercase leading-tight">
-                Processamento <br/> <span className="text-white">Tempo Real</span>
-              </div>
+          <div className="mt-8 grid grid-cols-2 gap-3 w-full opacity-60">
+            <div className="bg-slate-800/30 p-3 rounded-xl border border-slate-700/50 flex items-center gap-3">
+              <Zap className="text-sky-400" size={14} />
+              <span className="text-[9px] text-slate-400 font-bold uppercase">Calibração Automática</span>
             </div>
-            <div className="bg-slate-800/40 p-4 rounded-xl border border-slate-700/50 flex items-center gap-4">
-              <Target className="text-sky-500" size={20} />
-              <div className="text-[10px] text-slate-400 font-bold uppercase leading-tight">
-                Objetivo <br/> <span className="text-white">Fluidez 2.0</span>
-              </div>
+            <div className="bg-slate-800/30 p-3 rounded-xl border border-slate-700/50 flex items-center gap-3">
+              <Shield className="text-emerald-400" size={14} />
+              <span className="text-[9px] text-slate-400 font-bold uppercase">Modo Seguro Ativo</span>
             </div>
           </div>
         </div>
       </main>
 
-      <footer className="py-8 text-slate-600 text-[10px] font-bold uppercase tracking-[0.3em]">
-        Orion-System © 2025 // Data-Flow Pedro
+      <footer className="py-6 text-slate-700 text-[9px] font-bold uppercase tracking-[0.4em]">
+        Interface de Treino Adaptativa // Pedro H.
       </footer>
     </div>
   );
