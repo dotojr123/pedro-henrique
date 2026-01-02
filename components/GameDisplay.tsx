@@ -55,7 +55,7 @@ const GameDisplay: React.FC<GameDisplayProps> = ({ gameState }) => {
 
       <div className="mt-6 pt-6 border-t border-slate-700">
         <p className="text-sm text-sky-400/80 code-font">
-          > {gameState.message}
+          {">"} {gameState.message}
         </p>
       </div>
     </div>
